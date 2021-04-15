@@ -1,0 +1,10 @@
+{
+  "@class" : "org.apereo.cas.support.oauth.services.OAuthRegisteredService",
+  "clientId": "oauth_client_demo",
+  "clientSecret": "oauth_client_demo_secret",
+  "serviceId" : "^(http|https)://oauth.demo.bcw.com:8843/.*",
+  "name" : "OAuth client Service",
+  "id" : 1,
+  "supportedGrantTypes": [ "java.util.HashSet", [ "authorization_code" ] ],
+  "supportedResponseTypes": [ "java.util.HashSet", [ "code" ] ]
+}

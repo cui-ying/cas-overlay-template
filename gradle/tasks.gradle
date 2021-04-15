@@ -1,17 +1,21 @@
 import org.apache.ivy.util.url.*
 import org.apache.tools.ant.taskdefs.condition.Os
-import org.gradle.api.tasks.Copy
 
 import java.nio.file.*
-import org.gradle.internal.logging.text.StyledTextOutputFactory;
-import static org.gradle.internal.logging.text.StyledTextOutput.Style;
+import org.gradle.internal.logging.text.StyledTextOutputFactory
+import static org.gradle.internal.logging.text.StyledTextOutput.Style
 
 buildscript {
     repositories {
         mavenLocal()
         mavenCentral()
         jcenter()
+        maven {
+            url "https://oss.sonatype.org/content/repositories/snapshots"
+            mavenContent { snapshotsOnly() }
+        }
     }
+
     dependencies {
         classpath "org.apache.ivy:ivy:${project.ivyVersion}"
     }
@@ -171,18 +175,20 @@ task casVersion (group: "build", description: "Display the current CAS version")
 
 task createKeystore(group: "build", description: "Create CAS keystore") {
     doFirst {
-        mkdir "/etc/cas"
+        def keystoreDir = getPropOrDefault("keystoreDir", "/etc/cas")
 
-        def keystorePath = "/etc/cas/thekeystore"
+        mkdir "${keystoreDir}"
 
-        def dn = "CN=cas.example.org,OU=Example,OU=Org,C=US"
-        if (project.hasProperty("certificateDn")) {
-            dn = project.getProperty("certificateDn")
-        }
-        def subjectAltName = "dns:example.org,dns:localhost,ip:127.0.0.1"
-        if (project.hasProperty("certificateSubAltName")) {
-            subjectAltName = project.getProperty("certificateSubAltName")
-        }
+        def keystoreName = getPropOrDefault("keystoreName", "thekeystore")
+        def keystorePath = "${keystoreDir}/${keystoreName}.jks"
+
+        def certName = getPropOrDefault("certName", "${project.name}")
+        def certPath = "${keystoreDir}/${certName}.cer"
+
+        def dn = getPropOrDefault("certificateDn", "CN=cas.example.org,OU=Example,OU=Org,C=US")
+
+        def subjectAltName = getPropOrDefault("certificateSubAltName", "dns:example.org,dns:localhost,ip:127.0.0.1")
+
         // this will fail if thekeystore exists and has cert with cas alias already (so delete if you want to recreate)
         logger.info "Generating keystore for CAS with DN ${dn}"
         exec {
@@ -198,9 +204,9 @@ task createKeystore(group: "build", description: "Create CAS keystore") {
             workingDir "."
             commandLine "keytool", "-exportcert", "-alias", "cas",
                     "-storepass", "changeit", "-keystore", keystorePath,
-                    "-file", "/etc/cas/cas.cer"
+                    "-file", "${certPath}"
         }
-        logger.info "Import /etc/cas/cas.cer into your Java truststore (JAVA_HOME/lib/security/cacerts)"
+        logger.info "Import ${certPath} into your Java truststore (JAVA_HOME/lib/security/cacerts)"
     }
 }
 
@@ -252,4 +258,18 @@ task getResource(group: "build", description: "Fetch a CAS resource and move it 
 
 def isRunningCasServerSnapshot(casServerVersion) {
     return "${casServerVersion}".contains("-SNAPSHOT")
+}
+
+def getPropOrDefault(prop, dft) {
+    if (project.hasProperty(prop)) {
+        return project.property(prop)
+    }
+    return dft
+}
+
+task verifyRequiredJavaVersion {
+    logger.info "Checking current Java version ${JavaVersion.current()} for required Java version ${project.targetCompatibility}"
+    if (!JavaVersion.current().toString().equalsIgnoreCase("${project.targetCompatibility}")) {
+        throw new GradleException("Current Java version ${JavaVersion.current()} does not match required Java version ${project.targetCompatibility}")
+    }
 }
